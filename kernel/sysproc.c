@@ -6,6 +6,8 @@
 #include "spinlock.h"
 #include "proc.h"
 
+#include <stdbool.h>
+
 uint64
 sys_exit(void)
 {
@@ -89,3 +91,194 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+
+
+uint64 chartolower(int chr) {
+    if (chr >= 'A' && chr <= 'Z') {
+        return chr + 32;
+    }
+    return chr;
+}
+
+uint64 strcasecmp(const char *s1, const char *s2) {
+    while (*s1 && chartolower(*s2) == chartolower(*s1)) {
+        s2=s2+1;
+        s1=s1+1;
+    }
+
+    return chartolower(*s1) - chartolower(*s2);
+}
+
+
+// copied uniq.c strcpy function.
+char*
+strcpy(char *s, const char *t)
+{
+  char *os;
+
+  os = s;
+  while((*s++ = *t++) != 0)
+    ;
+  return os;
+}
+
+uint64
+sys_uniq(void) {
+  char mode[10];
+  char buffer[2048];
+  int maxBytes;
+  argstr(0, mode, 2);
+  argint(1, &maxBytes);
+  argstr(2, buffer, maxBytes);
+
+  printf("\nUniq command is getting executed in kernal mode\n\n");
+
+  if(strncmp(mode,"-i",2)==0) {
+    int length = 0;
+    char currentLine[256];
+    char previousLine[256] = "";
+
+    for(int charIndex=0; buffer[charIndex] !='\0'; charIndex++ ) {
+      if(buffer[charIndex] == '\n')
+      {
+        currentLine[length] = '\0';
+
+        if(strcasecmp(previousLine,currentLine)!=0) {
+          printf("%s\n", currentLine);
+        }
+        
+        strcpy(previousLine, currentLine);
+        length = 0;
+      }
+      else
+      {
+        currentLine[length] = buffer[charIndex];
+        length++;
+      }
+    }
+
+  } else if(strncmp(mode,"-c",2)==0) {
+    int count = 1, length = 0;
+    bool duplicateFound = false;
+    char currentLine[256];
+    char previousLine[256] = "";
+
+    for(int charIndex=0; buffer[charIndex] !='\0'; charIndex++ ) {
+      if(buffer[charIndex] == '\n' ) {
+        currentLine[length] = '\0';
+        if(strncmp(previousLine,currentLine,256) == 0){
+          duplicateFound = true;
+          count++;
+        }
+        else {
+					if(duplicateFound == true) {
+            printf("%d - %s\n", count, previousLine);
+            duplicateFound = false;
+          }
+					else {
+						if(strncmp(previousLine,"",256)!=0)
+							printf("%d - %s\n", 1, previousLine);
+					}
+					count = 1;
+        }
+        
+        strcpy(previousLine, currentLine);
+        length = 0;
+      }
+      else {
+        currentLine[length] = buffer[charIndex];
+        length++;
+      }
+    }
+    
+    printf("%d - %s\n", count, previousLine);
+
+  } 
+  else if(strncmp(mode,"-d",2)==0) {
+    int length = 0;
+    bool duplicateFound = false;
+    char currentLine[256];
+    char previousLine[256] = "";
+
+    for (int charIndex = 0; buffer[charIndex] != '\0'; charIndex++) 
+    {
+      if(buffer[charIndex] == '\n')
+      {
+        currentLine[length] = '\0';
+        if(strncmp(previousLine,currentLine, 256)==0)
+          duplicateFound = true;
+        else
+        {
+          if(duplicateFound == true){
+            printf("%s\n", previousLine);
+            duplicateFound = false;
+          }
+        }
+        
+        strcpy(previousLine, currentLine);
+        length = 0;
+      }
+      else
+      {
+        currentLine[length] = buffer[charIndex];
+        length++;
+      }
+    }
+  } 
+  else {
+    int length = 0;
+    char currentLine[256];
+    char previousLine[256] = "";
+
+    for (int charIndex = 0; buffer[charIndex] != '\0'; charIndex++) {
+      if (buffer[charIndex] == '\n') {
+        currentLine[length] = '\0';
+        if(strncmp(previousLine,currentLine, 256)!=0) {
+          printf("%s\n", currentLine);
+        }
+        
+        strcpy(previousLine, currentLine);
+        length = 0;
+      }
+      else
+      {
+        currentLine[length] = buffer[charIndex];
+        length++;
+      }
+    }
+  }
+
+  memset(buffer, 0, sizeof(buffer));
+  return 0;
+}
+
+
+uint64
+sys_head(void) {
+  int topN;
+  int maxBytes;
+  int linesPrintedCount = 0;
+  char buffer[2048];
+
+  printf("\nHead command is getting executed in kernal mode\n\n");
+  
+  argint(0, &topN);
+  argint(1, &maxBytes);
+  argstr(2, buffer, maxBytes);
+
+  for(int charIndex=0; buffer[charIndex] !='\0'; charIndex++ ) {
+    if(buffer[charIndex] == '\n'){
+      linesPrintedCount++;
+    }
+    consputc(buffer[charIndex]);
+    if(linesPrintedCount == topN) {
+      break;
+    }
+  }
+
+  memset(buffer, 0, sizeof(buffer));
+
+  return 0;
+}
+
