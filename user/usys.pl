@@ -38,4 +38,5 @@ entry("sleep");
 entry("uptime");
 entry("uniq");
 entry("head");
+entry("ps");
 

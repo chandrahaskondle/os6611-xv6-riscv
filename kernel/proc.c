@@ -322,6 +322,14 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
+  acquire(&np->lock);  
+  np->ctime = ticks;
+  release(&np->lock);
+
+  // printf("\nFork called by process \"%s\" with PID: %d.\n-->New created process details:<--\n", p->name, p->pid);
+  // printf("PID\tName\tCtime\tEtime\tTtime\n");
+  // printf("%d\t%s\t%d\t%d\n", np->pid, np->name, np->ctime, np->etime, np->ttime);
+
   return pid;
 }
 
@@ -378,7 +386,16 @@ exit(int status)
   p->xstate = status;
   p->state = ZOMBIE;
 
+  // after the process is marked as ZOMBIE
+  // calculate the process endtime and total time
+  p->etime = ticks;
+  p->ttime = p->etime - p->ctime;
+
   release(&wait_lock);
+
+  printf("\n>>>> Execution done, below are the statistics of the process with PID: %d <<<<\n", p->pid);
+  printf("PID\tName\t\tCtime\tEtime\tTtime\n");
+  printf("%d\t%s\t%d\t%d\t%d\n", p->pid, p->name, p->ctime, p->etime, p->ttime);
 
   // Jump into the scheduler, never to return.
   sched();
@@ -681,3 +698,30 @@ procdump(void)
     printf("\n");
   }
 }
+
+// ps command
+int
+ps(void)
+{
+  static char *states[] = {
+  [UNUSED]    "unused",
+  [USED]      "used",
+  [SLEEPING]  "sleep",
+  [RUNNABLE]  "runnable",
+  [RUNNING]   "run",
+  [ZOMBIE]    "zombie"
+  };
+  struct proc *p;
+  char *state;
+
+  printf("\n=======> PS Command Executed <=======\nPID\tState\tName\t\tCtime\tEtime\tTtime\n");
+  for(p = proc; p < &proc[NPROC]; p++){
+    if(p->state == UNUSED)
+      continue;
+    else
+      state = states[p->state];
+    printf("%d\t%s\t%s\t%d\t%d\t%d\n", p->pid, state, p->name,p->ctime, p->etime, p->ttime);
+  }
+  return 0;
+}
+

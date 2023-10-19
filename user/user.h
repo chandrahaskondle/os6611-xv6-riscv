@@ -24,6 +24,7 @@ int sleep(int);
 int uptime(void);
 int uniq(char*, int, char*);
 int head(int, int, char*);
+int ps(void);
 
 // ulib.c
 int stat(const char*, struct stat*);
