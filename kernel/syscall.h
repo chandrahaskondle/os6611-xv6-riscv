@@ -23,3 +23,4 @@
 #define SYS_uniq   22
 #define SYS_head   23
 #define SYS_ps     24
+#define SYS_putil  25

@@ -94,6 +94,8 @@ struct proc {
   int ctime;                   // Process Creation time
   int etime;                   // Process End time
   int ttime;                   // Process Total time
+  int wtime;                   // wait time
+  int tatime;                  // turn around time
 
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
@@ -107,4 +109,5 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int priority;                // Process priority (priority scheduling)
 };

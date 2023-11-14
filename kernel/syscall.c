@@ -104,6 +104,7 @@ extern uint64 sys_close(void);
 extern uint64 sys_uniq(void);
 extern uint64 sys_head(void);
 extern uint64 sys_ps(void);
+extern uint64 sys_putil(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -131,7 +132,8 @@ static uint64 (*syscalls[])(void) = {
 [SYS_close]   sys_close,
 [SYS_uniq]    sys_uniq,
 [SYS_head]    sys_head,
-[SYS_ps]    sys_ps,
+[SYS_ps]      sys_ps,
+[SYS_putil]   sys_putil, 
 };
 
 void

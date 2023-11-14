@@ -132,7 +132,7 @@ sys_uniq(void) {
   argint(1, &maxBytes);
   argstr(2, buffer, maxBytes);
 
-  printf("\nUniq command is getting executed in kernal mode\n\n");
+  printf("\nUniq command is getting executed in kernel mode\n\n");
 
   if(strncmp(mode,"-i",2)==0) {
     int length = 0;
@@ -261,7 +261,7 @@ sys_head(void) {
   int linesPrintedCount = 0;
   char buffer[2048];
 
-  printf("\nHead command is getting executed in kernal mode\n\n");
+  printf("\nHead command is getting executed in kernel mode\n\n");
   
   argint(0, &topN);
   argint(1, &maxBytes);
@@ -288,3 +288,17 @@ sys_ps(void)
   ps();
   return 0;
 }
+
+uint64
+sys_putil(void)
+{
+  int pid, pr, flag;
+  char pname[16];
+  argint(0, &pid);
+  argstr(1, pname, 16);
+  argint(2, &pr);
+  argint(3, &flag);
+
+  return putil(pid, pname, pr, flag);
+}
+

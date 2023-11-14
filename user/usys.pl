@@ -39,4 +39,5 @@ entry("uptime");
 entry("uniq");
 entry("head");
 entry("ps");
+entry("putil");
 

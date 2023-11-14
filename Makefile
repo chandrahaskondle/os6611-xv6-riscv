@@ -137,6 +137,7 @@ UPROGS=\
 	$U/_test_uniq\
 	$U/_test_head\
 	$U/_test_ps\
+	$U/_test_fcfs\
 
 fs.img: mkfs/mkfs README example.txt abc.txt def.txt $(UPROGS)
 	mkfs/mkfs fs.img README example.txt abc.txt def.txt $(UPROGS)

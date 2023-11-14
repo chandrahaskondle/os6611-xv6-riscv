@@ -183,11 +183,11 @@ main(int argc, char *argv[])
     }
     uniq_userfunction(argv[1], fd);
 
-    // making a uniq system call
-    fd = open(argv[2], 0);
-    char buffer[2048];
-    int bytescount = read(fd, buffer, 2048);
-    uniq(argv[1], bytescount, buffer);
+    // // making a uniq system call
+    // fd = open(argv[2], 0);
+    // char buffer[2048];
+    // int bytescount = read(fd, buffer, 2048);
+    // uniq(argv[1], bytescount, buffer);
     close(fd);
   } 
   else{
@@ -199,11 +199,11 @@ main(int argc, char *argv[])
     }
     uniq_userfunction("", fd);
 
-    // making a uniq system call
-    fd = open(argv[1], 0);
-    char buffer[2048];
-    int bytescount = read(fd, buffer, 2048);
-    uniq("", bytescount, buffer);
+    // // making a uniq system call
+    // fd = open(argv[1], 0);
+    // char buffer[2048];
+    // int bytescount = read(fd, buffer, 2048);
+    // uniq("", bytescount, buffer);
     close(fd);
   }
 

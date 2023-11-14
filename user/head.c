@@ -57,13 +57,13 @@ main(int argc, char *argv[])
       head_userprogam(atoi(argv[2]), fd);
       close(fd);
       
-      // making a head command system call
-      fd = open(argv[i], 0);
-      char buffer[1024];
-      int bytescount = read(fd, buffer, 1024);
-      head(atoi(argv[2]), bytescount,  buffer);
-      memset(buffer, 0, sizeof(buffer));
-      close(fd);
+      // // making a head command system call
+      // fd = open(argv[i], 0);
+      // char buffer[1024];
+      // int bytescount = read(fd, buffer, 1024);
+      // head(atoi(argv[2]), bytescount,  buffer);
+      // memset(buffer, 0, sizeof(buffer));
+      // close(fd);
     }
   }
   else {
@@ -80,13 +80,13 @@ main(int argc, char *argv[])
       head_userprogam(14, fd);
       close(fd);
 
-      // making a head command system call
-      fd = open(argv[i], 0);
-      char buffer[2048];
-      int bytescount = read(fd, buffer, 2048);
-      head(14, bytescount, buffer);
-      memset(buffer, 0, sizeof(buffer));
-      close(fd);
+      // // making a head command system call
+      // fd = open(argv[i], 0);
+      // char buffer[2048];
+      // int bytescount = read(fd, buffer, 2048);
+      // head(14, bytescount, buffer);
+      // memset(buffer, 0, sizeof(buffer));
+      // close(fd);
     }
   }
   

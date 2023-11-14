@@ -25,6 +25,7 @@ int uptime(void);
 int uniq(char*, int, char*);
 int head(int, int, char*);
 int ps(void);
+int putil(int, char*, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

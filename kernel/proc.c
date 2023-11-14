@@ -26,6 +26,11 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+// for calculating average wait time and turn around time.
+int total_wtime = 0;
+int total_tatime = 0;
+int total_procs = 0;
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -48,13 +53,13 @@ void
 procinit(void)
 {
   struct proc *p;
-  
+
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
-      initlock(&p->lock, "proc");
-      p->state = UNUSED;
-      p->kstack = KSTACK((int) (p - proc));
+    initlock(&p->lock, "proc");
+    p->state = UNUSED;
+    p->kstack = KSTACK((int) (p - proc));
   }
 }
 
@@ -93,7 +98,7 @@ int
 allocpid()
 {
   int pid;
-  
+
   acquire(&pid_lock);
   pid = nextpid;
   nextpid = nextpid + 1;
@@ -124,6 +129,10 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->ctime = ticks;
+  p->priority = 10; // default priority of process
+  p->wtime = 0;
+  p->tatime = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -188,7 +197,7 @@ proc_pagetable(struct proc *p)
   // only the supervisor uses it, on the way
   // to/from user space, so not PTE_U.
   if(mappages(pagetable, TRAMPOLINE, PGSIZE,
-              (uint64)trampoline, PTE_R | PTE_X) < 0){
+               (uint64)trampoline, PTE_R | PTE_X) < 0){
     uvmfree(pagetable, 0);
     return 0;
   }
@@ -196,7 +205,7 @@ proc_pagetable(struct proc *p)
   // map the trapframe page just below the trampoline page, for
   // trampoline.S.
   if(mappages(pagetable, TRAPFRAME, PGSIZE,
-              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+               (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
     uvmunmap(pagetable, TRAMPOLINE, 1, 0);
     uvmfree(pagetable, 0);
     return 0;
@@ -219,13 +228,13 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 // assembled from ../user/initcode.S
 // od -t xC ../user/initcode
 uchar initcode[] = {
-  0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x45, 0x02,
-  0x97, 0x05, 0x00, 0x00, 0x93, 0x85, 0x35, 0x02,
-  0x93, 0x08, 0x70, 0x00, 0x73, 0x00, 0x00, 0x00,
-  0x93, 0x08, 0x20, 0x00, 0x73, 0x00, 0x00, 0x00,
-  0xef, 0xf0, 0x9f, 0xff, 0x2f, 0x69, 0x6e, 0x69,
-  0x74, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00,
-  0x00, 0x00, 0x00, 0x00
+    0x17, 0x05, 0x00, 0x00, 0x13, 0x05, 0x45, 0x02,
+    0x97, 0x05, 0x00, 0x00, 0x93, 0x85, 0x35, 0x02,
+    0x93, 0x08, 0x70, 0x00, 0x73, 0x00, 0x00, 0x00,
+    0x93, 0x08, 0x20, 0x00, 0x73, 0x00, 0x00, 0x00,
+    0xef, 0xf0, 0x9f, 0xff, 0x2f, 0x69, 0x6e, 0x69,
+    0x74, 0x00, 0x00, 0x24, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00
 };
 
 // Set up first user process.
@@ -236,7 +245,7 @@ userinit(void)
 
   p = allocproc();
   initproc = p;
-  
+
   // allocate one user page and copy initcode's instructions
   // and data into it.
   uvmfirst(p->pagetable, initcode, sizeof(initcode));
@@ -322,9 +331,10 @@ fork(void)
   np->state = RUNNABLE;
   release(&np->lock);
 
-  acquire(&np->lock);  
   np->ctime = ticks;
-  release(&np->lock);
+  np->priority = 10; // default child process priority set to 2
+  np->wtime = 0;
+  np->tatime = 0;
 
   // printf("\nFork called by process \"%s\" with PID: %d.\n-->New created process details:<--\n", p->name, p->pid);
   // printf("PID\tName\tCtime\tEtime\tTtime\n");
@@ -390,12 +400,18 @@ exit(int status)
   // calculate the process endtime and total time
   p->etime = ticks;
   p->ttime = p->etime - p->ctime;
+  p->tatime = p->etime - p->ctime;
+
+  total_wtime += p->wtime;
+  total_tatime += p->tatime;
+  total_procs++;
 
   release(&wait_lock);
 
-  printf("\n>>>> Execution done, below are the statistics of the process with PID: %d <<<<\n", p->pid);
-  printf("PID\tName\t\tCtime\tEtime\tTtime\n");
-  printf("%d\t%s\t%d\t%d\t%d\n", p->pid, p->name, p->ctime, p->etime, p->ttime);
+  // printf("\n>>>> Execution done, below are the statistics of the process with PID: %d <<<<\n", p->pid);
+  // printf("PID\tPriority\tCreation Time\tWait Time\tTurn Around Time\tName\n");
+  // printf("%d\t%d\t\t%d\t\t%d\t\t%d\t\t\t%s\n", p->pid, p->priority, p->ctime, p->wtime, p->tatime, p->name);
+  // printf("---- Avg wait time: %d.%d & Avg turnaround time: %d.%d of above processes ----\n\n", total_wtime / total_procs, (total_wtime % total_procs)*100 / total_procs,  total_tatime / total_procs, (total_tatime % total_procs)*100 / total_procs);
 
   // Jump into the scheduler, never to return.
   sched();
@@ -426,7 +442,7 @@ wait(uint64 addr)
           // Found one.
           pid = pp->pid;
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
-                                  sizeof(pp->xstate)) < 0) {
+                                   sizeof(pp->xstate)) < 0) {
             release(&pp->lock);
             release(&wait_lock);
             return -1;
@@ -445,7 +461,7 @@ wait(uint64 addr)
       release(&wait_lock);
       return -1;
     }
-    
+
     // Wait for a child to exit.
     sleep(p, &wait_lock);  //DOC: wait-sleep
   }
@@ -469,12 +485,27 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
+    struct proc *lowP = 0;
+
     for(p = proc; p < &proc[NPROC]; p++) {
+      if(p->state == RUNNABLE) {
+        if (lowP == 0 || p->ctime < lowP->ctime) {
+          lowP = p;
+        }
+      }
+    }
+
+    p = lowP;
+    if(p != 0) {
+      int tempStartTime = ticks;
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
+
+        p->wtime = ticks - p->ctime;
+
         p->state = RUNNING;
         c->proc = p;
         swtch(&c->context, &p->context);
@@ -484,8 +515,47 @@ scheduler(void)
         c->proc = 0;
       }
       release(&p->lock);
+
+      if(p->etime == 0)
+        p->wtime = tempStartTime - p->ctime;
+      else
+        p->wtime += tempStartTime - p->etime; 
+      p->etime = ticks;
     }
   }
+}
+
+// flag = 0, makes a process Runnable
+// flag = 1, makes a process Sleeping
+int putil(int pid, char* processname, int priority, int flag)
+{
+  struct proc *p;
+  for (p = proc; p < &proc[NPROC]; p++)
+  {
+    acquire(&p->lock);
+    if (p->pid == pid)
+    {
+      if(flag == 1) {
+        safestrcpy(p->name, processname, sizeof(p->name));
+        p->priority = priority;    
+        if(p->state == RUNNABLE) {
+          p->state = SLEEPING;
+          sched();
+        // printf("\nputil: Process is made Sleeping - pid: %d curPid: %d, curPState: %d\n", pid, p->pid, p->state);
+        }
+      }
+      else if(flag == 0) {
+        if(p->state == SLEEPING)
+          p->state = RUNNABLE;
+        // printf("\nputil: Process is made Runnable - pid: %d curPid: %d, curPState: %d\n", pid, p->pid, p->state);
+      }
+
+      release(&p->lock);
+      break;
+    }
+    release(&p->lock);
+  }
+  return 0;
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -553,7 +623,7 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
-  
+
   // Must acquire p->lock in order to
   // change p->state and then call sched.
   // Once we hold p->lock, we can be
@@ -632,7 +702,7 @@ int
 killed(struct proc *p)
 {
   int k;
-  
+
   acquire(&p->lock);
   k = p->killed;
   release(&p->lock);
@@ -676,12 +746,12 @@ void
 procdump(void)
 {
   static char *states[] = {
-  [UNUSED]    "unused",
-  [USED]      "used",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
+      [UNUSED]    "unused",
+      [USED]      "used",
+      [SLEEPING]  "sleep ",
+      [RUNNABLE]  "runble",
+      [RUNNING]   "run   ",
+      [ZOMBIE]    "zombie"
   };
   struct proc *p;
   char *state;
@@ -704,24 +774,27 @@ int
 ps(void)
 {
   static char *states[] = {
-  [UNUSED]    "unused",
-  [USED]      "used",
-  [SLEEPING]  "sleep",
-  [RUNNABLE]  "runnable",
-  [RUNNING]   "run",
-  [ZOMBIE]    "zombie"
+      [UNUSED]    "unused",
+      [USED]      "used",
+      [SLEEPING]  "sleep",
+      [RUNNABLE]  "runnable",
+      [RUNNING]   "run",
+      [ZOMBIE]    "zombie"
   };
   struct proc *p;
   char *state;
 
-  printf("\n=======> PS Command Executed <=======\nPID\tState\tName\t\tCtime\tEtime\tTtime\n");
+  printf("\n=======> PS Command Executed <=======\n");
+  printf("PID\tState\t\tPriority\tCreation Time\tWait Time\tTurn Around Time\tName\n");
   for(p = proc; p < &proc[NPROC]; p++){
     if(p->state == UNUSED)
       continue;
     else
       state = states[p->state];
-    printf("%d\t%s\t%s\t%d\t%d\t%d\n", p->pid, state, p->name,p->ctime, p->etime, p->ttime);
+    printf("%d\t%s\t\t%d\t\t%d\t\t%d\t\t%d\t\t\t%s\n", p->pid, state, p->priority, p->ctime, p->wtime, p->tatime, p->name);
   }
+    printf("---- Avg wait time: %d.%d & Avg turnaround time: %d.%d of above processes ----\n\n", total_wtime / total_procs, (total_wtime % total_procs)*100 / total_procs,  total_tatime / total_procs, (total_tatime % total_procs)*100 / total_procs);
+
   return 0;
 }
 
